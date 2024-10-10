@@ -47,3 +47,14 @@ model Votes {
 
   @@id([vid, cid])
 }
+
+model Admin {
+  aid       String   @id @default(cuid())
+  name      String
+  email     String
+  password  String
+  position  String
+  currentToken String @default(cuid())
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
