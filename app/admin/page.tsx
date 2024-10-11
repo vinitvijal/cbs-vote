@@ -1,79 +1,61 @@
 'use client'
-import { useCallback, useEffect, useState } from "react"
+import { useCallback, useEffect } from "react"
 import Image from "next/image"
 import { Button } from "@/components/ui/button"
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs"
 import { ScrollArea } from "@/components/ui/scroll-area"
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table"
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, Cell } from 'recharts'
 import { ChevronDown, ChevronUp, Menu } from "lucide-react"
 import sscbs from "@/app/sscbs.jpg"
-import { Voter } from "@prisma/client"
-import { getVoters } from "@/actions/votes/actions"
+import { Candidate as RealCand, Voter, Votes } from "@prisma/client"
+import { Candidates, getVoters, getVotes } from "@/actions/votes/actions"
 import { toast } from "sonner"
 import { ReloadIcon } from "@radix-ui/react-icons"
-
-  
-  interface SortConfig {
-    key: keyof Voter | null
-    direction: 'ascending' | 'descending'
-  }
-
+import React, { useState, useMemo } from "react"
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card"
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, TooltipProps } from 'recharts'
+import { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent"
 
 
+interface SortConfig {
+  key: keyof Voter | null
+  direction: 'ascending' | 'descending'
+}
 
 
-const resultsData = [
-    { 
-      position: "President", 
-      candidates: [
-        { name: "Alice Johnson", votes: 250 },
-        { name: "Bob Williams", votes: 200 },
-        { name: "Charlie Brown", votes: 150 }
-      ]
-    },
-    {
-      position: "Vice President",
-      candidates: [
-        { name: "Diana Clark", votes: 220 },
-        { name: "Ethan Davis", votes: 180 }
-      ]
-    },
-    {
-      position: "Cultural Head",
-      candidates: [
-        { name: "Fiona Green", votes: 190 },
-        { name: "George White", votes: 170 },
-        { name: "Hannah Lee", votes: 140 }
-      ]
-    }
-  ]
 
-const colorPalette = ['#8884d8', '#82ca9d', '#ffc658', '#ff7300', '#a4de6c']
+
+
 
 export default function AdminDashboard() {
+  const [votes, setVotes] = useState<Votes[] | null>(null);
+  const [candidates, setCandidates] = useState<RealCand[] | null>(null)
   const [students, setStudents] = useState<Voter[] | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: null, direction: 'ascending' })
 
 
   useEffect(() => {
-    
+
     fetchStudents()
   }, [])
 
   async function fetchStudents() {
     toast.info('Fetching students data...')
     const res = await getVoters();
+    const cand = await Candidates();
+    const vote = await getVotes();
     toast.success('Students data fetched successfully')
     console.log("data get", res);
     setStudents(res)
+    setVotes(vote)
+    setCandidates(cand)
   }
 
 
   async function Refresh() {
-    toast.info('Refreshing data...')  
+    toast.info('Refreshing data...')
     fetchStudents()
     toast.success('Data refreshed successfully')
   }
@@ -104,6 +86,34 @@ export default function AdminDashboard() {
     setSortConfig({ key, direction })
   }
 
+
+  const electionData = useMemo(() => {
+    if (!votes || !candidates) return []
+    return candidates.map(candidate => ({
+      name: candidate.name,
+      votes: votes.filter(vote => vote.cid === candidate.cid).length,
+      position: candidate.position
+    }))
+  }, [candidates])
+
+  const colorPalette = [
+    '#FF6B6B', '#4ECDC4', '#45B7D1', '#FFA07A',
+    '#98D8C8', '#F06292', '#AED581', '#7986CB'
+  ]
+
+  const CustomTooltip = ({ active, payload }: TooltipProps<ValueType, NameType>) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload
+      return (
+        <div className="bg-white p-4 border border-gray-200 rounded shadow-md">
+          <p className="font-bold">{data.name}</p>
+          <p>{`Position: ${data.position}`}</p>
+          <p>{`Votes: ${data.votes}`}</p>
+        </div>
+      )
+    }
+    return null
+  }
   const SortableHeader: React.FC<{ children: React.ReactNode; sortKey: keyof Voter }> = ({ children, sortKey }) => (
     <TableHead className="cursor-pointer" onClick={() => requestSort(sortKey)}>
       <div className="flex items-center">
@@ -115,7 +125,31 @@ export default function AdminDashboard() {
     </TableHead>
   )
 
+
+  const [selectedPosition, setSelectedPosition] = useState<string>("All Positions")
+
+  const positions = useMemo(() => {
+    if (!candidates) return []
+    const uniquePositions = candidates?.map(candidate => candidate.position).filter((value, index, self) => self.indexOf(value) === index)
+    return ["All Positions", ...uniquePositions]
+  }, [candidates])
+
+  const candidateColors = useMemo(() => {
+    return electionData.reduce((acc, candidate, index) => {
+      acc[candidate.name] = colorPalette[index % colorPalette.length]
+      return acc
+    }, {} as Record<string, string>)
+  }, [candidates, votes])
+
+  const filteredData = useMemo(() => {
+    return selectedPosition === "All Positions"
+      ? electionData
+      : electionData.filter(candidate => candidate.position === selectedPosition)
+  }, [selectedPosition])
+
   
+
+
 
   return (
     <div className="min-h-screen bg-gray-100">
@@ -158,12 +192,12 @@ export default function AdminDashboard() {
         <Tabs defaultValue="attendance" className="space-y-4">
           <span className=" flex justify-between items-center">
 
-          <TabsList>
-            <TabsTrigger value="attendance">Attendance</TabsTrigger>
-            <TabsTrigger value="analysis">Analysis</TabsTrigger>
-            <TabsTrigger value="results">Results</TabsTrigger>
-          </TabsList>
-          <ReloadIcon className="h-6 w-6 text-gray-600 cursor-pointer" onClick={() => Refresh()} />
+            <TabsList>
+              <TabsTrigger value="attendance">Attendance</TabsTrigger>
+              <TabsTrigger value="analysis">Analysis</TabsTrigger>
+              <TabsTrigger value="results">Results</TabsTrigger>
+            </TabsList>
+            <ReloadIcon className="h-6 w-6 text-gray-600 cursor-pointer" onClick={() => Refresh()} />
           </span>
 
           <TabsContent value="attendance">
@@ -181,8 +215,8 @@ export default function AdminDashboard() {
                         <SortableHeader sortKey="email">Email</SortableHeader>
                         <SortableHeader sortKey="rollno">Roll Number</SortableHeader>
                         <SortableHeader sortKey="society">Class/Society</SortableHeader>
-                        <SortableHeader sortKey="attended">Attedance</SortableHeader>     
-                        <SortableHeader sortKey="voted">Status</SortableHeader>                   
+                        <SortableHeader sortKey="attended">Attedance</SortableHeader>
+                        <SortableHeader sortKey="voted">Status</SortableHeader>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -230,27 +264,27 @@ export default function AdminDashboard() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                        {students?.filter((v)=> v.por !== "CR").map((e)=>e.society).filter((value, index, currentVal)=> currentVal.indexOf(value) === index).map((society) => (
+                        {students?.filter((v) => v.por !== "CR").map((e) => e.society).filter((value, index, currentVal) => currentVal.indexOf(value) === index).map((society) => (
                           <TableRow key={society}>
                             <TableCell>{society}</TableCell>
                             <TableCell>
-                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${students?.filter((e)=>e.society === society).filter((e)=>e.por === "President")[0]?.voted ? 'bg-green-100 text-green-800' : students?.filter((e)=>e.society === society).filter((e)=>e.por === "President")[0]?.voted === false && 'bg-red-100 text-red-800'}`}>
-                                {students?.filter((e)=>e.society === society).filter((e)=>e.por === "President")[0]?.name}
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${students?.filter((e) => e.society === society).filter((e) => e.por === "President")[0]?.voted ? 'bg-green-100 text-green-800' : students?.filter((e) => e.society === society).filter((e) => e.por === "President")[0]?.voted === false && 'bg-red-100 text-red-800'}`}>
+                                {students?.filter((e) => e.society === society).filter((e) => e.por === "President")[0]?.name}
                               </span>
                             </TableCell>
                             <TableCell>
-                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${students?.filter((e)=>e.society === society).filter((e)=>e.por === "Vice President")[0]?.voted ? 'bg-green-100 text-green-800' : students?.filter((e)=>e.society === society).filter((e)=>e.por === "Vice President")[0]?.voted === false && 'bg-red-100 text-red-800'}`}>
-                            {students?.filter((e)=>e.society === society).filter((e)=>e.por === "Vice President")[0]?.name}
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${students?.filter((e) => e.society === society).filter((e) => e.por === "Vice President")[0]?.voted ? 'bg-green-100 text-green-800' : students?.filter((e) => e.society === society).filter((e) => e.por === "Vice President")[0]?.voted === false && 'bg-red-100 text-red-800'}`}>
+                                {students?.filter((e) => e.society === society).filter((e) => e.por === "Vice President")[0]?.name}
                               </span>
                             </TableCell>
                             <TableCell>
-                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${students?.filter((e)=>e.society === society).filter((e)=>e.por === "Coordinator")[0]?.voted ? 'bg-green-100 text-green-800' : students?.filter((e)=>e.society === society).filter((e)=>e.por === "Coordinator")[0]?.voted === false && 'bg-red-100 text-red-800'}`}>
-                            {students?.filter((e)=>e.society === society).filter((e)=>e.por === "Coordinator")[0]?.name}
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${students?.filter((e) => e.society === society).filter((e) => e.por === "Coordinator")[0]?.voted ? 'bg-green-100 text-green-800' : students?.filter((e) => e.society === society).filter((e) => e.por === "Coordinator")[0]?.voted === false && 'bg-red-100 text-red-800'}`}>
+                                {students?.filter((e) => e.society === society).filter((e) => e.por === "Coordinator")[0]?.name}
                               </span>
                             </TableCell>
                             <TableCell>
-                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${students?.filter((e)=>e.society === society).filter((e)=>e.por === "Coordinator")[1]?.voted ? 'bg-green-100 text-green-800' : students?.filter((e)=>e.society === society).filter((e)=>e.por === "Coordinator")[1]?.voted === false && 'bg-red-100 text-red-800'}`}>
-                                {students?.filter((e)=>e.society === society).filter((e)=>e.por === "Coordinator")[1]?.name}
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${students?.filter((e) => e.society === society).filter((e) => e.por === "Coordinator")[1]?.voted ? 'bg-green-100 text-green-800' : students?.filter((e) => e.society === society).filter((e) => e.por === "Coordinator")[1]?.voted === false && 'bg-red-100 text-red-800'}`}>
+                                {students?.filter((e) => e.society === society).filter((e) => e.por === "Coordinator")[1]?.name}
                               </span>
                             </TableCell>
                           </TableRow>
@@ -275,17 +309,17 @@ export default function AdminDashboard() {
                         </TableRow>
                       </TableHeader>
                       <TableBody>
-                      {students?.filter((v)=> v.por === "CR").map((e)=>e.society).filter((value, index, currentVal)=> currentVal.indexOf(value) === index).map((course) => (                         
-                        <TableRow key={course}>
+                        {students?.filter((v) => v.por === "CR").map((e) => e.society).filter((value, index, currentVal) => currentVal.indexOf(value) === index).map((course) => (
+                          <TableRow key={course}>
                             <TableCell>{course}</TableCell>
                             <TableCell>
-                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${students?.filter((e)=>e.society === course).filter((e)=>e.por === "CR")[0]?.voted === true ? 'bg-green-100 text-green-800' : students?.filter((e)=>e.society === course).filter((e)=>e.por === "CR")[0]?.voted === false ? 'bg-red-100 text-red-800' : ''}`}>
-                              {students?.filter((e)=>e.society === course).filter((e)=>e.por === "CR")[0]?.name}
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${students?.filter((e) => e.society === course).filter((e) => e.por === "CR")[0]?.voted === true ? 'bg-green-100 text-green-800' : students?.filter((e) => e.society === course).filter((e) => e.por === "CR")[0]?.voted === false ? 'bg-red-100 text-red-800' : ''}`}>
+                                {students?.filter((e) => e.society === course).filter((e) => e.por === "CR")[0]?.name}
                               </span>
                             </TableCell>
                             <TableCell>
-                            <span className={`px-2 py-1 rounded-full text-xs font-semibold ${students?.filter((e)=>e.society === course).filter((e)=>e.por === "CR")[1]?.voted === true ? 'bg-green-100 text-green-800' : students?.filter((e)=>e.society === course).filter((e)=>e.por === "CR")[1]?.voted === false ? 'bg-red-100 text-red-800' : ''}`}>
-                            {students?.filter((e)=>e.society === course).filter((e)=>e.por === "CR")[1]?.name}
+                              <span className={`px-2 py-1 rounded-full text-xs font-semibold ${students?.filter((e) => e.society === course).filter((e) => e.por === "CR")[1]?.voted === true ? 'bg-green-100 text-green-800' : students?.filter((e) => e.society === course).filter((e) => e.por === "CR")[1]?.voted === false ? 'bg-red-100 text-red-800' : ''}`}>
+                                {students?.filter((e) => e.society === course).filter((e) => e.por === "CR")[1]?.name}
                               </span>
                             </TableCell>
                           </TableRow>
@@ -318,12 +352,12 @@ export default function AdminDashboard() {
                           </TableRow>
                         </TableHeader>
                         <TableBody>
-                          {resultsData.flatMap((result) => 
-                            result.candidates.map((candidate, index) => (
-                              <TableRow key={`${result.position}-${candidate.name}`}>
-                                {index === 0 && <TableCell rowSpan={result.candidates.length}>{result.position}</TableCell>}
-                                <TableCell>{candidate.name}</TableCell>
-                                <TableCell>{candidate.votes}</TableCell>
+                          {candidates && positions.flatMap((position) =>
+                            votes && candidates.filter((v) => v.position === position).map((candi, index) => (
+                              <TableRow key={`${position}-${candi.name}`}>
+                                {index === 0 && <TableCell rowSpan={candidates.filter((v) => v.position === position).length}>{position}</TableCell>}
+                                <TableCell>{candi.name}</TableCell>
+                                <TableCell>{votes?.filter((v) => v.cid === candi.cid && v.position === position).length || 0}</TableCell>
                               </TableRow>
                             ))
                           )}
@@ -331,58 +365,63 @@ export default function AdminDashboard() {
                       </Table>
                     </ScrollArea>
                   </div>
-                  <div>
-                    <h3 className="text-lg font-semibold mb-2">Voting Distribution</h3>
-                    <ResponsiveContainer width="100%" height={400}>
-                      <BarChart
-                        data={resultsData.flatMap(result => 
-                          result.candidates.map(candidate => ({
-                            position: result.position,
-                            candidate: candidate.name,
-                            votes: candidate.votes
-                          }))
-                        )}
-                        margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
-                      >
-                        <CartesianGrid strokeDasharray="3 3" />
-                        <XAxis dataKey="position" />
-                        <YAxis />
-                        <Tooltip />
-                        <Legend />
-                        {resultsData.map((result, index) => (
-                          <Bar
-                            key={index}
-                            dataKey="votes"
-                            fill={colorPalette[index % colorPalette.length]}
-                            name={result.position}
-                          >
-                            {result.candidates.map((candidate, candidateIndex) => (
-                              <Cell
-                                key={`cell-${index}-${candidateIndex}`}
-                                fill={colorPalette[(index + candidateIndex) % colorPalette.length]}
-                              />
+                  <Card className="w-full max-w-4xl mx-auto">
+                    <CardHeader>
+                      <CardTitle>Election Results</CardTitle>
+                      <CardDescription>Vote distribution for each candidate</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="mb-4">
+                        <Select onValueChange={(value) => setSelectedPosition(value)}>
+                          <SelectTrigger className="w-[180px]">
+                            <SelectValue placeholder="Select position" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {positions.map((position) => (
+                              <SelectItem key={position} value={position}>
+                                {position}
+                              </SelectItem>
                             ))}
-                          </Bar>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="h-[400px] w-full">
+                        <ResponsiveContainer width="100%" height="100%">
+                          <BarChart
+                            data={filteredData}
+                            margin={{ top: 20, right: 30, left: 20, bottom: 5 }}
+                          >
+                            <CartesianGrid strokeDasharray="3 3" />
+                            <XAxis dataKey="name" angle={-45} textAnchor="end" height={70} />
+                            <YAxis />
+                            <Tooltip content={<CustomTooltip />} />
+                            <Legend />
+                            <Bar dataKey="votes">
+                              {filteredData.map((entry, index) => (
+                                <Bar
+                                  key={`bar-${index}`}
+                                  dataKey="votes"
+                                  fill={candidateColors[entry.name]}
+                                  name={entry.name}
+                                />
+                              ))}
+                            </Bar>
+                          </BarChart>
+                        </ResponsiveContainer>
+                      </div>
+                      <div className="mt-4 grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-2">
+                        {filteredData.map((candidate, index) => (
+                          <div key={index} className="text-sm flex items-center">
+                            <span
+                              className="w-3 h-3 rounded-full mr-2 flex-shrink-0"
+                              style={{ backgroundColor: candidateColors[candidate.name] }}
+                            ></span>
+                            <span className="truncate">{candidate.name}: {candidate.votes} votes</span>
+                          </div>
                         ))}
-                      </BarChart>
-                    </ResponsiveContainer>
-                    <div className="mt-4 grid grid-cols-2 gap-2">
-                      {resultsData.map((result, index) => (
-                        <div key={index} className="text-sm">
-                          <strong>{result.position}:</strong>
-                          {result.candidates.map((candidate, candidateIndex) => (
-                            <div key={candidateIndex} className="flex items-center">
-                              <span
-                                className="w-3 h-3 rounded-full mr-2"
-                                style={{ backgroundColor: colorPalette[(index + candidateIndex) % colorPalette.length] }}
-                              ></span>
-                              {candidate.name}
-                            </div>
-                          ))}
-                        </div>
-                      ))}
-                    </div>
-                  </div>
+                      </div>
+                    </CardContent>
+                  </Card>
                 </div>
               </CardContent>
             </Card>

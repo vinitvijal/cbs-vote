@@ -49,3 +49,8 @@ export async function Voting(votes: Record<string, string>, vid: string) {
 
   return true
 }
+
+export async function getVotes(){
+  const votes = await prisma.votes.findMany()
+  return votes
+}
