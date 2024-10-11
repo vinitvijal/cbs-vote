@@ -7,8 +7,9 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import sscbs from '@/app/sscbs.jpg'
 import { LoaderCircle } from "lucide-react"
-import { VoterLogin } from "@/actions/auth/action"
+import { SuperLogin, VoterLogin } from "@/actions/auth/action"
 import { useRouter } from "next/navigation"
+import { toast } from "sonner"
 
 export default function Component() {
   const router = useRouter();
@@ -19,7 +20,7 @@ export default function Component() {
   const [isFormValid, setIsFormValid] = useState(false)
 
   useEffect(() => {
-    const isEmailValid = email.endsWith("@sscbs.du.ac.in")
+    const isEmailValid = email.toLowerCase().endsWith("@sscbs.du.ac.in")
     const isPasswordValid = password.length > 5
     setIsFormValid(!!role && isEmailValid && isPasswordValid)
   }, [role, email, password])
@@ -29,15 +30,45 @@ export default function Component() {
     e.preventDefault()
     if (isFormValid) {
       if(role === 'voter') {
-        const res = await VoterLogin(email, password);
+        const res = await VoterLogin(email.toLowerCase(), password);
         if(res) {
           console.log("Voter logged in", res)
-          sessionStorage.setItem("voter", JSON.stringify(res))
+          sessionStorage.setItem("user", JSON.stringify(res))
+          sessionStorage.setItem("role", role)
+          sessionStorage.setItem("vid", res.vid)
+          toast.success(`Welcome ${res.name}, you have successfully logged in`)
           router.push("/voter")
         } else {
+          toast.error("Invalid credentials")
           console.log("Invalid credentials")
         }
       // console.log("Form submitted", { role, email, password })
+    }else if(role === 'moderator') {
+      const res = await SuperLogin(email.toLowerCase(), password, role);
+      if(res) {
+        console.log("Moderator logged in", res)
+        sessionStorage.setItem("user", JSON.stringify(res))
+        sessionStorage.setItem("role", res.position)
+        sessionStorage.setItem("tokenId", res.currentToken)
+        toast.success(`Welcome ${res.name}, you have successfully logged in`)
+        router.push("/moderator")
+      } else {
+        toast.error("Invalid credentials")
+        console.log("Invalid credentials")
+      }
+    }else if(role === 'admin') {
+      const res = await SuperLogin(email.toLowerCase(), password, role);
+      if(res) {
+        console.log("Admin logged in", res)
+        sessionStorage.setItem("user", JSON.stringify(res))
+        sessionStorage.setItem("role", res.position)
+        sessionStorage.setItem("tokenId", res.currentToken)
+        toast.success(`Welcome ${res.name}, you have successfully logged in`)
+        router.push("/admin")
+      } else {
+        toast.error("Invalid credentials")
+        console.log("Invalid credentials")
+      }
     }
   }
   setLoading(false)

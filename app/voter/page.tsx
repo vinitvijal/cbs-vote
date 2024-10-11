@@ -10,6 +10,11 @@ import { AlertCircle, CheckCircle2, Vote } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
 import sscbs from '@/app/sscbs.jpg'
+import { useRouter } from "next/navigation"
+import { Candidate, Voter } from "@prisma/client"
+import { getVoter } from "@/actions/auth/action"
+import { toast } from "sonner"
+import { Candidates } from "@/actions/votes/actions"
 
 const positions = [
   {
@@ -47,19 +52,43 @@ const positions = [
 ]
 
 export default function Component() {
+  const router = useRouter();
+  
+  const [userData, setUserData] = useState<Voter | null>(null)
   const [votes, setVotes] = useState<Record<number, number>>({})
   const [hasVoted, setHasVoted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
+  const [posts, setPosts] = useState<string[]>()
+  const [candidates, setCandidates] = useState<Candidate[]>()
   const [progress, setProgress] = useState(0)
 
   useEffect(() => {
-    const checkVotingStatus = async () => {
-      await new Promise(resolve => setTimeout(resolve, 1000))
-      const votedStatus = localStorage.getItem("hasVoted") === "true"
-      setHasVoted(votedStatus)
-    }
+    async function fetchData() {
+      const vid = sessionStorage.getItem("vid")
+      const role = sessionStorage.getItem("role")
+      if(!vid || vid === null || role !== "voter") {
+        toast.error("You are not logged in")
+        router.push("/")
+        return;
+      }
+      console.log(vid)
+      const data = await getVoter(vid)
+      if(!data) {
+        toast.error("You are not logged in")
+        router.push("/")
+        return
+      }else{
+        setUserData(data)
+        console.log("User data", data)
+        setHasVoted(userData?.voted || false)
+      }
 
-    checkVotingStatus()
+      const cand = await Candidates()
+      const pos = cand.map((c) => c.position).filter((value, index, self) => self.indexOf(value) === index)
+      setPosts(pos)
+      setCandidates(cand)
+    }
+    fetchData()
   }, [])
 
   useEffect(() => {
@@ -81,7 +110,7 @@ export default function Component() {
     setIsSubmitting(false)
   }
 
-  return (
+  return userData && (
     <div className="min-h-screen bg-gradient-to-b from-gray-100 to-gray-200 flex flex-col">
       {/* Header */}
       <header className="bg-white shadow-md">
@@ -98,7 +127,7 @@ export default function Component() {
           </div>
           <div className="text-center sm:text-right">
             <h2 className="text-lg sm:text-xl font-semibold text-gray-700">College Council Election</h2>
-            <p className="text-sm text-gray-600">Cast your vote today</p>
+            <p className="text-sm text-gray-600">{userData.name + ", " + userData.por + " | " + userData.society}</p>
           </div>
         </div>
       </header>

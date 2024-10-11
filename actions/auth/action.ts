@@ -14,7 +14,7 @@ export async function VoterLogin(email: string, password: string) {
 }
 
 export async function SuperLogin(email: string, password: string, role: string) {
-    const voter = await prisma.admin.findFirst({
+    const admin = await prisma.admin.findFirst({
       where: {
         email,
         password,
@@ -22,8 +22,8 @@ export async function SuperLogin(email: string, password: string, role: string) 
       }
     })
 
-    if(voter) {
-      const updatedVoter = await prisma.admin.updateMany({
+    if(admin) {
+      await prisma.admin.updateMany({
         where: {
           email
         },
@@ -31,8 +31,23 @@ export async function SuperLogin(email: string, password: string, role: string) 
           currentToken: crypto.randomUUID()
         }
       })
-    return updatedVoter
+    const updatedAdmin = await prisma.admin.findFirst({
+      where: {
+        email
+      }
+    })
+    return updatedAdmin
 
     }
     return null
   }
+
+
+export async function getVoter(vid: string) {
+  const voter = await prisma.voter.findFirst({
+    where: {
+      vid
+    }
+  })
+  return voter
+}
