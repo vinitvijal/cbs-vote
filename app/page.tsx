@@ -6,11 +6,16 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import sscbs from '@/app/sscbs.jpg'
+import { LoaderCircle } from "lucide-react"
+import { VoterLogin } from "@/actions/auth/action"
+import { useRouter } from "next/navigation"
 
 export default function Component() {
+  const router = useRouter();
   const [role, setRole] = useState<string | null>(null)
   const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
+  const [loading, setLoading] = useState(false)
   const [isFormValid, setIsFormValid] = useState(false)
 
   useEffect(() => {
@@ -19,13 +24,24 @@ export default function Component() {
     setIsFormValid(!!role && isEmailValid && isPasswordValid)
   }, [role, email, password])
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
+    setLoading(true)
     e.preventDefault()
     if (isFormValid) {
-      // Handle form submission
-      console.log("Form submitted", { role, email, password })
+      if(role === 'voter') {
+        const res = await VoterLogin(email, password);
+        if(res) {
+          console.log("Voter logged in", res)
+          sessionStorage.setItem("voter", JSON.stringify(res))
+          router.push("/voter")
+        } else {
+          console.log("Invalid credentials")
+        }
+      // console.log("Form submitted", { role, email, password })
     }
   }
+  setLoading(false)
+}
 
   return (
     <div className="min-h-screen bg-gray-100 flex flex-col items-center justify-center p-4">
@@ -91,8 +107,8 @@ export default function Component() {
                 required
               />
             </div>
-            <Button type="submit" className="w-full" disabled={!isFormValid}>
-              Sign In
+            <Button type="submit" className="w-full" disabled={!isFormValid && !loading}>
+              {loading ? <LoaderCircle className="animate-spin"/>: "Sign In"}
             </Button>
           </form>
         </CardContent>

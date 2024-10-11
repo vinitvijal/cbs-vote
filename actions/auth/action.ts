@@ -31,6 +31,8 @@ export async function SuperLogin(email: string, password: string, role: string) 
           currentToken: crypto.randomUUID()
         }
       })
+    return updatedVoter
+
     }
-    return voter
+    return null
   }
