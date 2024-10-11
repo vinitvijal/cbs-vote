@@ -6,7 +6,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group"
 import { Label } from "@/components/ui/label"
 import { ScrollArea } from "@/components/ui/scroll-area"
-import { AlertCircle, CheckCircle2, Vote } from "lucide-react"
+import { CheckCircle2 } from "lucide-react"
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert"
 import { Progress } from "@/components/ui/progress"
 import sscbs from '@/app/sscbs.jpg'
@@ -14,48 +14,14 @@ import { useRouter } from "next/navigation"
 import { Candidate, Voter } from "@prisma/client"
 import { getVoter } from "@/actions/auth/action"
 import { toast } from "sonner"
-import { Candidates } from "@/actions/votes/actions"
+import { Candidates, Voting } from "@/actions/votes/actions"
 
-const positions = [
-  {
-    id: 1,
-    title: "President",
-    candidates: [
-      { id: 1, name: "John Doe" },
-      { id: 2, name: "Jane Smith" },
-    ],
-  },
-  {
-    id: 2,
-    title: "Vice President",
-    candidates: [
-      { id: 3, name: "Alice Johnson" },
-      { id: 4, name: "Bob Williams" },
-    ],
-  },
-  {
-    id: 3,
-    title: "Cultural Head",
-    candidates: [
-      { id: 5, name: "Charlie Brown" },
-      { id: 6, name: "Diana Clark" },
-    ],
-  },
-  {
-    id: 4,
-    title: "First Year Representative",
-    candidates: [
-      { id: 7, name: "Eva Green" },
-      { id: 8, name: "Frank White" },
-    ],
-  },
-]
 
 export default function Component() {
   const router = useRouter();
   
   const [userData, setUserData] = useState<Voter | null>(null)
-  const [votes, setVotes] = useState<Record<number, number>>({})
+  const [votes, setVotes] = useState<Record<string, string>>({})
   const [hasVoted, setHasVoted] = useState(false)
   const [isSubmitting, setIsSubmitting] = useState(false)
   const [posts, setPosts] = useState<string[]>()
@@ -80,7 +46,7 @@ export default function Component() {
       }else{
         setUserData(data)
         console.log("User data", data)
-        setHasVoted(userData?.voted || false)
+        setHasVoted(data.voted)
       }
 
       const cand = await Candidates()
@@ -93,20 +59,34 @@ export default function Component() {
 
   useEffect(() => {
     const votedPositions = Object.keys(votes).length
-    const totalPositions = positions.length
+    if(!posts) return;
+    const totalPositions = posts.length
     setProgress((votedPositions / totalPositions) * 100)
   }, [votes])
 
-  const handleVote = (positionId: number, candidateId: number) => {
+  const handleVote = (positionId: string, candidateId: string) => {
     setVotes(prev => ({ ...prev, [positionId]: candidateId }))
   }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
+    console.log(votes)
     setIsSubmitting(true)
-    await new Promise(resolve => setTimeout(resolve, 2000))
-    localStorage.setItem("hasVoted", "true")
-    setHasVoted(true)
+    if(!userData){
+      toast.error("You are not logged in")
+      router.push("/")
+      return
+    }
+
+    const res = await Voting(votes, userData.vid)
+    if(res === true) {
+      toast.success("Vote submitted successfully")
+      setHasVoted(true)
+    }else{
+      toast.error("You have already voted")
+      setHasVoted(true)
+    }
+
     setIsSubmitting(false)
   }
 
@@ -143,7 +123,7 @@ export default function Component() {
                   {/* <Vote className="h-6 w-6 text-blue-600" /> */}
             Voting Ballot</CardTitle>
             <CardDescription className="text-center text-gray-600">
-              Select your candidates for each position
+            {userData.name + ", " + userData.por + " | " + userData.society}
             </CardDescription>
           </CardHeader>
           <CardContent>
@@ -158,19 +138,19 @@ export default function Component() {
             ) : (
               <form onSubmit={handleSubmit}>
                 <ScrollArea className="h-[50vh] pr-4">
-                  {positions.map(position => (
-                    <div key={position.id} className="mb-6">
-                      <h3 className="text-lg font-semibold mb-2 text-gray-700">{position.title}</h3>
+                  {posts && posts.map((position, idx) => (
+                    <div key={idx} className="mb-6">
+                      <h3 className="text-lg font-semibold mb-2 text-gray-700">{position}</h3>
                       <RadioGroup
-                        onValueChange={(value) => handleVote(position.id, parseInt(value))}
-                        value={votes[position.id]?.toString()}
+                        onValueChange={(value) => handleVote(position, value)}
+                        value={votes[idx]?.toString()}
                         className="space-y-2"
                       >
-                        {position.candidates.map(candidate => (
-                          <div key={candidate.id} className="flex items-center space-x-2 bg-white rounded-lg p-3 shadow-sm transition-all hover:shadow-md">
-                            <RadioGroupItem value={candidate.id.toString()} id={`${position.id}-${candidate.id}`} />
-                            <Label htmlFor={`${position.id}-${candidate.id}`} className="flex-grow cursor-pointer">
-                              {candidate.name}
+                        {candidates && candidates.filter((value) => value.position === position).map(candidate => (
+                          <div key={candidate.cid} className="flex items-center space-x-2 bg-white rounded-lg p-3 shadow-sm transition-all hover:shadow-md">
+                            <RadioGroupItem value={candidate.cid} id={`${position}-${candidate.cid}`} />
+                            <Label htmlFor={`${position}-${candidate.cid}`} className="flex-grow cursor-pointer">
+                              {candidate.name} | {candidate.rollno}
                             </Label>
                           </div>
                         ))}

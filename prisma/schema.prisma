@@ -18,6 +18,7 @@ model Voter {
   name      String
   email     String
   password  String
+  rollno    String   @default("22999")
   society   String
   por       String
   attended  Boolean
