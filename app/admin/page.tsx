@@ -16,6 +16,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer, TooltipProps } from 'recharts'
 import { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent"
+import { Switch } from "@/components/ui/switch"
+import { Label } from "@/components/ui/label"
 
 
 interface SortConfig {
@@ -147,7 +149,7 @@ export default function AdminDashboard() {
       : electionData.filter(candidate => candidate.position === selectedPosition)
   }, [selectedPosition])
 
-  
+
 
 
 
@@ -167,7 +169,10 @@ export default function AdminDashboard() {
           </div>
           <div className="hidden md:flex space-x-4">
             <Button variant="ghost">Home</Button>
-            <Button variant="ghost">Settings</Button>
+            <div className="flex items-center space-x-2">
+              <Switch id="airplane-mode" onChange={(e)=>console.log(e)} />
+              <Label htmlFor="airplane-mode">Voting Mode</Label>
+            </div>
             <Button variant="ghost">Logout</Button>
           </div>
           <div className="md:hidden">

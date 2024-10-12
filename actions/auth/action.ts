@@ -51,3 +51,18 @@ export async function getVoter(vid: string) {
   })
   return voter
 }
+
+
+export async function getCbsStatus() {
+  const status = await prisma.status.findFirst(
+    {
+      where: {
+        id: "sscbs"
+    }
+  }
+  )
+  if (!status) {
+    return {status: false}
+  }
+  return status.status;
+}

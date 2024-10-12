@@ -12,7 +12,7 @@ import { Progress } from "@/components/ui/progress"
 import sscbs from '@/app/sscbs.jpg'
 import { useRouter } from "next/navigation"
 import { Candidate, Voter } from "@prisma/client"
-import { getVoter } from "@/actions/auth/action"
+import { getCbsStatus, getVoter } from "@/actions/auth/action"
 import { toast } from "sonner"
 import { Candidates, Voting } from "@/actions/votes/actions"
 
@@ -38,6 +38,13 @@ export default function Component() {
         return;
       }
       console.log(vid)
+      const status = await getCbsStatus();
+      console.log(status)
+      if(status === false) {
+        toast.error("Voting is closed")
+        router.replace("/voter/thankyou")
+        return
+      }
       const data = await getVoter(vid)
       if(!data) {
         toast.error("You are not logged in")
@@ -77,7 +84,12 @@ export default function Component() {
       router.push("/")
       return
     }
-
+    const status = await getCbsStatus();
+    if(status === false) {
+      toast.error("Voting is closed, Your vote has not been submitted")
+      router.replace("/voter/thankyou")
+      return
+    }
     const res = await Voting(votes, userData.vid)
     if(res === true) {
       toast.success("Vote submitted successfully")
