@@ -1,5 +1,6 @@
 'use server'
 import { PrismaClient } from "@prisma/client"
+import exp from "constants"
 
 const prisma = new PrismaClient()
 
@@ -25,7 +26,8 @@ export async function SuperLogin(email: string, password: string, role: string) 
     if(admin) {
       await prisma.admin.updateMany({
         where: {
-          email
+          email,
+          position: role
         },
         data: {
           currentToken: crypto.randomUUID()
@@ -33,7 +35,8 @@ export async function SuperLogin(email: string, password: string, role: string) 
       })
     const updatedAdmin = await prisma.admin.findFirst({
       where: {
-        email
+        email,
+        position: role
       }
     })
     return updatedAdmin
@@ -62,7 +65,19 @@ export async function getCbsStatus() {
   }
   )
   if (!status) {
-    return {status: false}
+    return false;
   }
   return status.status;
+}
+
+export async function changeStatus(status: boolean) {
+  const updatedStatus = await prisma.status.update({
+    where: {
+      id: "sscbs"
+    },
+    data: {
+      status
+    }
+  })
+  return updatedStatus
 }

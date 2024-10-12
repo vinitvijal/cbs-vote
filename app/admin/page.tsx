@@ -18,6 +18,8 @@ import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, Responsive
 import { NameType, ValueType } from "recharts/types/component/DefaultTooltipContent"
 import { Switch } from "@/components/ui/switch"
 import { Label } from "@/components/ui/label"
+import { changeStatus, getCbsStatus } from "@/actions/auth/action"
+import { useRouter } from "next/navigation"
 
 
 interface SortConfig {
@@ -31,12 +33,13 @@ interface SortConfig {
 
 
 export default function AdminDashboard() {
+  const router = useRouter();
   const [votes, setVotes] = useState<Votes[] | null>(null);
   const [candidates, setCandidates] = useState<RealCand[] | null>(null)
   const [students, setStudents] = useState<Voter[] | null>(null)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const [sortConfig, setSortConfig] = useState<SortConfig>({ key: null, direction: 'ascending' })
-
+  const [status, setStatus] = useState<boolean>(false)
 
   useEffect(() => {
 
@@ -44,17 +47,47 @@ export default function AdminDashboard() {
   }, [])
 
   async function fetchStudents() {
+    const user = sessionStorage.getItem("user")
+    const token = sessionStorage.getItem("token")
+    if (!user || !token) {
+      toast.error('You are not logged in')
+      router.replace('/')
+      return
+    }
+    const role = JSON.parse(user).position
+    if (role !== "admin") {
+      toast.error('You are not authorized')
+      router.replace('/')
+      console.log(user)
+      return
+    }
     toast.info('Fetching students data...')
     const res = await getVoters();
+    const stat = await getCbsStatus();
     const cand = await Candidates();
     const vote = await getVotes();
     toast.success('Students data fetched successfully')
     console.log("data get", res);
     setStudents(res)
+    setStatus(stat)
     setVotes(vote)
     setCandidates(cand)
   }
 
+
+  const handleLogout = () => {
+    sessionStorage.clear()
+    localStorage.clear()
+    toast.success('Logged out successfully')
+    router.replace('/')
+  }
+
+  const handleStatus = async () => {
+    toast.info('Changing voting status...')
+    const res = await changeStatus(!status);
+    setStatus(res.status)
+    toast.success('Voting status changed successfully')
+  }
 
   async function Refresh() {
     toast.info('Refreshing data...')
@@ -168,12 +201,11 @@ export default function AdminDashboard() {
             <h1 className="text-2xl font-bold text-gray-800">Admin Dashboard</h1>
           </div>
           <div className="hidden md:flex space-x-4">
-            <Button variant="ghost">Home</Button>
             <div className="flex items-center space-x-2">
-              <Switch id="airplane-mode" onChange={(e)=>console.log(e)} />
+              <Switch id="airplane-mode" checked={status} onCheckedChange={handleStatus} />
               <Label htmlFor="airplane-mode">Voting Mode</Label>
             </div>
-            <Button variant="ghost">Logout</Button>
+            <Button variant="ghost" onClick={() => { handleLogout() }}>Logout</Button>
           </div>
           <div className="md:hidden">
             <Button variant="ghost" onClick={() => setMobileMenuOpen(!mobileMenuOpen)}>
@@ -183,10 +215,12 @@ export default function AdminDashboard() {
         </div>
         {mobileMenuOpen && (
           <div className="md:hidden bg-white border-t border-gray-200">
-            <div className="container mx-auto px-4 py-2 space-y-2">
-              <Button variant="ghost" className="w-full justify-start">Home</Button>
-              <Button variant="ghost" className="w-full justify-start">Settings</Button>
-              <Button variant="ghost" className="w-full justify-start">Logout</Button>
+            <div className="container mx-auto px-4 py-2 space-y-2 flex justify-between items-center">
+              <div className="flex items-center space-x-2">
+                <Switch id="airplane-mode" checked={status} onCheckedChange={handleStatus} />
+                <Label htmlFor="airplane-mode">Voting Mode</Label>
+              </div>
+              <Button variant="ghost" className="justify-start" onClick={() => { handleLogout() }}>Logout</Button>
             </div>
           </div>
         )}

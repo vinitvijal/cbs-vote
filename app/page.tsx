@@ -61,8 +61,7 @@ export default function Component() {
       if(res) {
         console.log("Admin logged in", res)
         sessionStorage.setItem("user", JSON.stringify(res))
-        sessionStorage.setItem("role", res.position)
-        sessionStorage.setItem("tokenId", res.currentToken)
+        sessionStorage.setItem("token", res.currentToken)
         toast.success(`Welcome ${res.name}, you have successfully logged in`)
         router.push("/admin")
       } else {
